@@ -1,18 +1,12 @@
 from flask import Flask
 from config import Config
-from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-#from flask_login import LoginManager, current_user
-from flask_restful import Api, Resource
+from flask_restful import Api
 from flask_cors import CORS
 import logging
-import os
 
-from flask_jwt_extended import create_access_token
-from flask_jwt_extended import get_jwt_identity
-from flask_jwt_extended import jwt_required
-from flask_jwt_extended import JWTManager
-
+from resources.user import Login, CreateUser, User, Logout, ChangePassword
+from externals import db, jwt
 
 
 
@@ -23,25 +17,25 @@ CORS(app)
 # Config
 app.config.from_object(Config)
 app.config['JWT_SECRET_KEY'] = 'secret_key'
-db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-#login = LoginManager(app)
-#login.init_app(app)
-jwt = JWTManager(app)
+# login = LoginManager(app)
+# login.init_app(app)
+
+db.init_app(app)
+jwt.init_app(app)
 api = Api(app)
+
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 logging.getLogger('flask_cors').level = logging.DEBUG
 
-
-from resources.example import User, Login, Logout, CreateUser
-api.add_resource(User, '/')
-api.add_resource(CreateUser, '/createUser')
+# Resources
 api.add_resource(Login, '/login')
+api.add_resource(User, '/user')
 api.add_resource(Logout, '/logout')
-from logging.config import dictConfig
-
-#logging.basicConfig(filename='demo.log', level=logging.DEBUG)
+api.add_resource(ChangePassword, '/change-password')
+api.add_resource(CreateUser, '/create-user')
 
 
 if __name__ == '__main__':
-	app.run(debug=True, host='0.0.0.0', port=80)
+	app.run(debug=True, host='192.168.1.47', port=81)

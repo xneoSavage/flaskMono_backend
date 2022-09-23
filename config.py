@@ -9,5 +9,5 @@ class Config(object):
 	MONOBANK_TOKEN = os.environ.get('MONO_TOKEN')
 	# db connection
 	SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:savage@localhost/test_flask'
-	SQLALCHEMY_TRACK_MODIFICATIONS = True
+	SQLALCHEMY_TRACK_MODIFICATIONS = False
 

@@ -1,19 +1,21 @@
-from models import db
-from app import jwt
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt
+from externals import db, jwt
+from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity
 from flask_restful import Resource
 from flask import jsonify, make_response, request
-from models import Customer, Transaction, TokenBlocklist
+import models.user
+from models.block_list import TokenBlocklist
 
 
 class CreateUser(Resource):
+
 	def post(self):
 		username = request.json.get("username")
 		email = request.json.get("email")
-		if Customer.query.filter_by(username=username).first() or Customer.query.filter_by(email=email).first():
+
+		if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
 			return make_response(jsonify({'msg': 'Select another username or email!'}), 400)
 
-		user = Customer(username=username, email=email)
+		user = User(username=username, email=email)
 		user.set_password(request.json.get("password"))
 		db.session.add(user)
 		db.session.commit()
@@ -30,7 +32,7 @@ class Login(Resource):
 	@jwt.user_lookup_loader
 	def user_lookup_callback(self, jwt_data):
 		identity = jwt_data["sub"]
-		return Customer.query.filter_by(id=identity).one_or_none()
+		return User.query.filter_by(id=identity).one_or_none()
 
 
 	@jwt.token_in_blocklist_loader
@@ -43,7 +45,7 @@ class Login(Resource):
 
 		username = request.json.get("username", None)
 		password = request.json.get("password", None)
-		user = Customer.query.filter_by(username=username).first()
+		user = models.user.User.query.filter_by(username=username).first()
 
 		if user is None or not user.check_password(password):
 			return make_response(jsonify({"msg": 'Bad username or password'}), 401)
@@ -62,7 +64,6 @@ class Logout(Resource):
 
 	@jwt_required()
 	def delete(self):
-
 		token = get_jwt()
 		jti = token["jti"]
 		ttype = token["type"]
@@ -71,14 +72,36 @@ class Logout(Resource):
 		return make_response(jsonify({"msg": f"{ttype.capitalize()} token successfully revoked!"}), 200)
 
 
+class ChangePassword(Resource):
+	@jwt_required()
+	def post(self):
+		current_user = get_jwt_identity()
+		user = User.query.filter_by(id=current_user).first()
+		new_password = request.json.get("newPassword", None)
+		if user.check_password(new_password) is False:
+			user.password_hash = user.set_password(new_password)
+			token = get_jwt()
+			jti = token["jti"]
+			ttype = token["type"]
+			db.session.add(TokenBlocklist(jti=jti, type=ttype))
+			db.session.commit()
+			return make_response(jsonify({"msg": "New password is successfully set!"}), 200)
+
+		else:
+			return make_response(jsonify({"msg": "Password is not pass validation"}), 400)
+
+
 class User(Resource):
+
 	@jwt_required()
 	def get(self):
 		current_user = get_jwt_identity()
-		user = Customer.query.get(current_user)
+		user = User.query.get(current_user)
+
 		if user is None:
 			return make_response(jsonify({"msg": 'Current user is not valid!'}, 401))
-		records = Customer.query.all()
+		records = User.query.all()
+
 		data = [{
 				'id': customer.id,
 				'username': customer.username,
@@ -86,19 +109,3 @@ class User(Resource):
 				'email': customer.email
 		} for customer in records]
 		return make_response(jsonify(data), 200)
-
-
-
-class Transaction(Resource):
-	@jwt_required()
-	def post(self):
-		current_user = get_jwt_identity()
-		user = Customer.query.get(current_user)
-		if user is None:
-			return make_response(jsonify({"msg": 'Current user is not valid!'}, 401))
-
-		records = Transaction.query.all()
-		data = [{
-			'id'
-		}]
-
