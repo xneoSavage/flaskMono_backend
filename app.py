@@ -5,7 +5,9 @@ from flask_restful import Api
 from flask_cors import CORS
 import logging
 
-from resources.user import Login, CreateUser, User, Logout, ChangePassword
+from resources.user import User
+from resources.user import Login, CreateUser, Logout, ChangePassword, Apikey
+
 from externals import db, jwt
 
 
@@ -31,11 +33,11 @@ logging.getLogger('flask_cors').level = logging.DEBUG
 
 # Resources
 api.add_resource(Login, '/login')
-api.add_resource(User, '/user')
+# api.add_resource(User, '/user')
 api.add_resource(Logout, '/logout')
 api.add_resource(ChangePassword, '/change-password')
 api.add_resource(CreateUser, '/create-user')
-
+api.add_resource(Apikey, '/api-key')
 
 if __name__ == '__main__':
 	app.run(debug=True, host='192.168.1.47', port=81)

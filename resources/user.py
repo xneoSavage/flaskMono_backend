@@ -2,7 +2,8 @@ from externals import db, jwt
 from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity
 from flask_restful import Resource
 from flask import jsonify, make_response, request
-import models.user
+from models.user import User
+from models.api_key import ApiKey
 from models.block_list import TokenBlocklist
 
 
@@ -12,12 +13,12 @@ class CreateUser(Resource):
 		username = request.json.get("username")
 		email = request.json.get("email")
 
-		if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
+		if  User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
 			return make_response(jsonify({'msg': 'Select another username or email!'}), 400)
 
-		user = User(username=username, email=email)
-		user.set_password(request.json.get("password"))
-		db.session.add(user)
+		new_user = User(username=username, email=email)
+		new_user.set_password(request.json.get("password"))
+		db.session.add(new_user)
 		db.session.commit()
 		response = jsonify({"msg": "User created successfully!"})
 		response.headers.add('Access-Control-Allow-Origin', '*')
@@ -45,13 +46,13 @@ class Login(Resource):
 
 		username = request.json.get("username", None)
 		password = request.json.get("password", None)
-		user = models.user.User.query.filter_by(username=username).first()
+		user_login = User.query.filter_by(username=username).first()
 
-		if user is None or not user.check_password(password):
+		if user_login is None or not user_login.check_password(password):
 			return make_response(jsonify({"msg": 'Bad username or password'}), 401)
 
-		access_token = create_access_token(identity=user.id)
-		response = jsonify({"token": access_token, "user_id": user.id})
+		access_token = create_access_token(identity=user_login.id)
+		response = jsonify({"token": access_token, "user_id": user_login.id})
 
 		response.headers.add('Access-Control-Allow-Methods', "POST, GET, OPTIONS")
 		response.headers.add('Access-Control-Allow-Headers', "Origin, X-Api-Key, X-Requested-With, Content-Type, Accept, Authorization")
@@ -76,10 +77,10 @@ class ChangePassword(Resource):
 	@jwt_required()
 	def post(self):
 		current_user = get_jwt_identity()
-		user = User.query.filter_by(id=current_user).first()
+		user_login = User.query.filter_by(id=current_user).first()
 		new_password = request.json.get("newPassword", None)
-		if user.check_password(new_password) is False:
-			user.password_hash = user.set_password(new_password)
+		if user_login.check_password(new_password) is False:
+			user_login.password_hash = user_login.set_password(new_password)
 			token = get_jwt()
 			jti = token["jti"]
 			ttype = token["type"]
@@ -90,22 +91,51 @@ class ChangePassword(Resource):
 		else:
 			return make_response(jsonify({"msg": "Password is not pass validation"}), 400)
 
-
+"""""""""
 class User(Resource):
 
 	@jwt_required()
 	def get(self):
 		current_user = get_jwt_identity()
-		user = User.query.get(current_user)
+		user_login = user.User.query.get(current_user)
 
-		if user is None:
+		if user_login is None:
 			return make_response(jsonify({"msg": 'Current user is not valid!'}, 401))
-		records = User.query.all()
+		records = user.User.query.all()
 
 		data = [{
-				'id': customer.id,
-				'username': customer.username,
-				'api_key': customer.api_key,
-				'email': customer.email
-		} for customer in records]
+				'id': user_login.id,
+				'username': user_login.username,
+				'api_key': user_login.api_key,
+				'email': user_login.email
+		} for user_login in records]
 		return make_response(jsonify(data), 200)
+"""""""""
+
+class Apikey(Resource):
+	@jwt_required()
+	def post(self):
+		current_user = get_jwt_identity()
+		user_row = User.query.get(current_user)
+
+		if user_row:
+			user_id = user_row.id
+			api_key_request = request.json.get('api_key')
+			api_key_status = request.json.get('status')
+			project = request.json.get('project')
+
+			key_row = ApiKey(
+				user_id=user_id,
+				status=api_key_status,
+				project=project,
+				key=api_key_request
+			)
+
+			db.session.add(key_row)
+			db.session.commit()
+			return make_response(jsonify({'msg': 'Success, api key added!'}), 200)
+
+		else:
+			return make_response(jsonify({'msg': 'Smth went wrong'}), 400)
+
+
