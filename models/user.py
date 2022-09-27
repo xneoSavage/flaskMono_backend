@@ -11,7 +11,7 @@ class User(db.Model):
 
 	id = db.Column(db.Integer, primary_key=True)
 	created_at = db.Column(db.DateTime, default=datetime.utcnow())
-	updated_at = db.Column(db.DateTime)
+	updated_at = db.Column(db.DateTime, default=datetime.utcnow())
 	username = db.Column(db.String(64), index=True, unique=True)
 	email = db.Column(db.String(120), index=True, unique=True)
 	password_hash = db.Column(db.String(128))
@@ -19,7 +19,6 @@ class User(db.Model):
 	webhook_url = db.Column(db.String(39))
 	name = db.Column(db.String(100))
 	permissions = db.Column(db.String(30))
-	api_key = db.Column(db.String(44), unique=True)
 
 	def __repr__(self):
 		return f'User {self.username}'

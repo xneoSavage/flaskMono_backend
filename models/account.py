@@ -22,4 +22,3 @@ class Account(db.Model):
 
 	def __repr__(self):
 		return f'Card type {self.type}'
-

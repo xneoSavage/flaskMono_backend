@@ -115,18 +115,23 @@ class User(Resource):
 class Apikey(Resource):
 	@jwt_required()
 	def post(self):
+		"""
+		inserting api_key from mono, always status == new
+		required jwt and api_key from json
+		:return:
+		200 if everything is ok, row inserting
+		400 if smth went wrong
+		"""
 		current_user = get_jwt_identity()
 		user_row = User.query.get(current_user)
+		user_id = user_row.id
+		api_key_request = request.json.get('api_key', None)
+		project = request.json.get('project', None)
 
 		if user_row:
-			user_id = user_row.id
-			api_key_request = request.json.get('api_key')
-			api_key_status = request.json.get('status')
-			project = request.json.get('project')
 
 			key_row = ApiKey(
 				user_id=user_id,
-				status=api_key_status,
 				project=project,
 				key=api_key_request
 			)
