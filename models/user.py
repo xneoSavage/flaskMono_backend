@@ -29,3 +29,8 @@ class User(db.Model):
 
 	def check_password(self, password):
 		return check_password_hash(self.password_hash, password)
+
+class Meta:
+	model = User
+	include_relationships = True
+	load_instance = True
