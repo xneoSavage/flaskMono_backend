@@ -6,9 +6,10 @@ from flask_cors import CORS
 import logging
 from celery import Celery
 from resources.account import LoadAccount
+from resources.transaction import LoadTransaction, AllTransactions
 from resources.user import Login, CreateUser, Logout, ChangePassword, Apikey
 
-from externals import db, jwt, ext_celery
+from externals import db, jwt
 
 
 
@@ -48,7 +49,7 @@ def add(x, y):
 migrate = Migrate(app, db)
 # login = LoginManager(app)
 # login.init_app(app)
-ext_celery.init_app(app)
+
 db.init_app(app)
 jwt.init_app(app)
 api = Api(app)
@@ -65,6 +66,8 @@ api.add_resource(ChangePassword, '/change-password')
 api.add_resource(CreateUser, '/create-user')
 api.add_resource(Apikey, '/api-key')
 api.add_resource(LoadAccount, '/load-account')
+api.add_resource(LoadTransaction, '/load-transaction')
+api.add_resource(AllTransactions, '/get-transaction')
 
 
 if __name__ == '__main__':

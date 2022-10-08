@@ -20,6 +20,7 @@ class Account(db.Model):
 	masked_pan = db.Column(db.String(16), nullable=False)
 	type = db.Column(db.String(30))
 	iban = db.Column(db.String(34))
+	user = db.relationship('User', backref=db.backref('user', uselist=False))
 
 	def __repr__(self):
 		return f'Card type {self.type}'

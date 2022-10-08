@@ -28,7 +28,7 @@ class LoadAccount(Resource):
 
         # get mono token
         token_mono = ApiKey.query.filter_by(user_id=get_jwt_identity()).first()
-        token_mono = token_mono.key[0:-1]
+        token_mono = token_mono.key
         mono = monobank.Client(token_mono)
         client_data = mono.get_client_info()
 
@@ -38,9 +38,11 @@ class LoadAccount(Resource):
         row_user.client_id = client_data['clientId']
         row_user.permissions = client_data['permissions']
         row_user.updated_at = datetime.utcnow()
+        token_mono.status = 'active'
         db.session.add(row_user)
 
         for account in client_data['accounts']:
+
             # update account if exist
             if account['id'] in existed_accounts:
                 row_exist_account = Account.query.filter_by(account_id=account['id']).first()
@@ -63,6 +65,8 @@ class LoadAccount(Resource):
                     type=account['type'],
                     iban=account['iban']
                 )
+                token_mono.status = 'active'
+                db.session.add(token_mono)
                 db.session.add(row_account)
 
         db.session.commit()
