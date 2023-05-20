@@ -10,7 +10,7 @@ from flask_restful import Api
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.wrappers import Response
 
-from config import Config, configure_logging
+from config import Config
 from externals import db, jwt
 from resources.account import (
     AccountsData,
@@ -22,6 +22,7 @@ from resources.transaction import (
     CreditTransactions,
     LoadTransaction,
     TransByMCC,
+    MccAmountMonth,
     TransStatisticDebitCredit,
 )
 from resources.user import (
@@ -37,8 +38,8 @@ from resources.user import (
 
 # init app
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 CORS(app)
-
 
 def configure_logging(app):
     """Configure logging for the given Flask application.
@@ -72,7 +73,7 @@ logger = logging.getLogger('simpleExample')
 
 app.config.from_object(Config)
 app.config['JWT_SECRET_KEY'] = 'secret_key'
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=24)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
 
 app.wsgi_app = DispatcherMiddleware( # https://dlukes.github.io/flask-wsgi-url-prefix.html
@@ -84,7 +85,7 @@ migrate = Migrate(app, db)
 db.init_app(app)
 jwt.init_app(app)
 api = Api(app)
-
+CORS(app)
 @app.before_request
 def before_request():
     """Log details of incoming request for debugging purposes.
@@ -230,6 +231,7 @@ api.add_resource(CreditTransactions, '/credit-transaction')
 api.add_resource(TransStatisticDebitCredit, '/trans-debit-credit')
 api.add_resource(AmountByMCC, '/amount-mcc')
 api.add_resource(TransByMCC, '/trans-mcc')
+api.add_resource(MccAmountMonth, '/mcc-month')
 
 if __name__ == '__main__':
     app.run(host='127.0.0.47', port='81', debug=True, use_debugger=True)

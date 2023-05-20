@@ -29,7 +29,7 @@ from models.api_key import ApiKey
 from models.mcc import MccCode
 from models.transaction import Transaction
 from models.user import User
-from sqlalchemy import func
+from sqlalchemy import func, extract
 from resources.account import LoadAccount
 
 
@@ -153,7 +153,7 @@ class LoadTransaction(Resource):
                         # If the difference is greater than 30 days, return an error message
                     elif len(range_date) > 30 and count > 0:
                         return make_response(jsonify({"msg": 'Difference between last transaction date and date now\n'
-                                                             'is bigger than 30 days, load transactions!'}))
+                                                             'is bigger than 30 days, load transactions! Try to use POST instead!'}))
                     # Iterate through the transactions
                     for transaction in loaded_transactions:
                         # Insert the transaction into the Transactions table if it is newer than the last transaction
@@ -190,7 +190,7 @@ class LoadTransaction(Resource):
         return make_response(jsonify({'msg': 'Transactions loaded'}), 200)
 
 
-# AllTransactions is a Flask RESTful resource for handling HTTP GET requests for retrieving all transactions
+        # AllTransactions is a Flask RESTful resource for handling HTTP GET requests for retrieving all transactions
 # for the currently authenticated user. It is implemented using the Flask-JWT-Extended library for JWT
 # (JSON Web Token) authentication.
 class AllTransactions(Resource):
@@ -242,12 +242,22 @@ class CreditTransactions(Resource):
         prev_month_start, prev_month_end = prev_month()
 
         # get all transactions for the authenticated user in the previous month
-        transactions = Transaction.query.join(Account, Transaction.account) \
-            .join(User, Account.user) \
-            .join(MccCode, Transaction.mcc) \
+        query = db.session.query(
+            Transaction.transaction_id,
+            Transaction.amount,
+            Transaction.created_at,
+            Transaction.description,
+            Transaction.transaction_type,
+            Transaction.mcc,
+            MccCode.description.label('mcc_description')
+        )\
+            .join(Account, Transaction.account_id == Account.id) \
+            .join(MccCode, Transaction.mcc == MccCode.mcc_code) \
+            .join(User, Account.user_id == User.id) \
             .filter_by(id=get_jwt_identity()) \
-            .where(Transaction.created_at.between(prev_month_start, prev_month_end)) \
+            .where(Transaction.created_at.between(prev_month_start, prev_month_end), Transaction.transaction_type=='credit') \
             .order_by(Transaction.amount.asc()).all()
+
 
         # build a list of dictionaries representing each transaction
         data = [{
@@ -257,8 +267,8 @@ class CreditTransactions(Resource):
             "description": transaction.description,
             "type": transaction.transaction_type,
             "mcc": transaction.mcc,
-            "mcc_description": transaction.MccCode.description
-        } for transaction in transactions]
+            "mcc_description": transaction.mcc_description
+        } for transaction in query]
 
         # return the list of transactions in the response
         return make_response(jsonify(data), 200)
@@ -289,7 +299,7 @@ class TransStatisticDebitCredit(Resource):
             func.max(Transaction.amount).label('max_amount'),
             Account.account_id, Account.type,
             Account.credit_limit, Transaction.transaction_type,
-            Account.currency_code,
+            Account.currency_code, Transaction.description
         ) \
             .join(Account, Account.id == Transaction.account_id) \
             .join(User, User.id == Account.user_id) \
@@ -308,7 +318,7 @@ class TransStatisticDebitCredit(Resource):
             "count": result.count,
             "max_amount": result.max_amount,
             "currency_code": result.currency_code,
-            "biggest_operation": result.description,
+            "description": result.description,
         } for result in query]
 
         # add the start and end dates of the previous month to the response
@@ -325,49 +335,51 @@ class AmountByMCC(Resource):
     @jwt_required()
     def get(self):
         """
-             Retrieve the sum of transaction amounts by MCC code and transaction type for the authenticated user in the previous month.
+             Retrieve the sum of transaction amounts by MCC code and transaction type for the authenticated user, grouped by month and year.
              :return: a list of dictionaries representing the sum of amounts for each MCC code and transaction type.
         """
-        prev_month_start, prev_month_end = prev_month()
+        # get the sum of transaction amounts by MCC code and transaction type for the authenticated user,
+        # grouped by month and ordered by transaction type
+        request.headers.get('Authorization')
 
-        # get the sum of transaction amounts by MCC code and transaction type for the authenticated user
-        # in the previous month, ordered by transaction type
         query = db.session.query(
             func.sum(Transaction.amount).label('amount'),
             MccCode.mcc_code,
-            MccCode.description,
-            Transaction.transaction_type
+            MccCode.short_description,
+            Transaction.transaction_type,
+            func.date_trunc('month', Transaction.created_at).label('month'),
+            extract('year', Transaction.created_at).label('year')
         ) \
             .join(Account, Transaction.account_id == Account.id) \
             .join(MccCode, MccCode.mcc_code == Transaction.mcc) \
             .join(User, User.id == Account.user_id) \
             .filter(User.id == get_jwt_identity()) \
-            .filter(Transaction.created_at.between(prev_month_start, prev_month_end)) \
-            .group_by(MccCode.mcc_code, MccCode.description, Transaction.transaction_type) \
-            .order_by(Transaction.transaction_type.desc())
+            .group_by(MccCode.mcc_code, MccCode.short_description, Transaction.transaction_type, 'month', 'year') \
+            .order_by(Transaction.transaction_type.desc(), 'year', 'month')
 
-        # build a list of dictionaries representing the sum of amounts for each MCC code and transaction type
+        # build a list of dictionaries representing the sum of amounts for each MCC code, transaction type, and month
         data = [{
-            "start_date": prev_month_start,
-            "end_date": prev_month_end,
+            "month": result.month,
+            "year": result.year,
             "amount": result.amount,
             "mcc_code": result.mcc_code,
-            "mcc_description": result.description,
+            "mcc_description": result.short_description,
             "transaction_type": result.transaction_type
         } for result in query]
 
-        # return the list of MCC codes and transaction types in the response
+        # return the list of MCC codes, transaction types, and months in the response
         return make_response(jsonify(data), 200)
 
 
 
-class TransByMCC(Resource):
+
+class MccAmountMonth(Resource):
     """
     A class representing the endpoint for retrieving transactions filtered by MCC code.
     """
 
     @jwt_required()
-    def get(self):
+    def post(self):
         """
         This method handles GET requests to the endpoint. It retrieves a list of transactions for the authenticated user
         in the previous month that match the MCC code provided in the request body. The transactions are ordered by
@@ -378,39 +390,101 @@ class TransByMCC(Resource):
         # get the start and end dates for the previous month
         prev_month_start, prev_month_end = prev_month()
         # get the MCC code from the request body
-        request_mcc = request.json.get('mcc_code', None)
+        request_mcc = request.json.get("mcc_code", None)
+        request_transaction_type = request.json.get("transaction_type", None)
 
         # get the transactions for the given MCC code and the authenticated user in the previous month,
         # ordered by amount in descending order
-        query = (db.session.query(Transaction.created_at,
-                                  Transaction.amount,
-                                  Transaction.description,
-                                  Transaction.transaction_type,
-                                  Transaction.mcc,
-                                  MccCode.description.label('mcc_description'))
-                 .join(Account, Transaction.account_id == Account.id)
-                 .join(MccCode, MccCode.mcc_code == Transaction.mcc)
-                 .join(User, User.id == Account.user_id)
-                 .filter(User.id == get_jwt_identity())
-                 .filter(Transaction.created_at.between(prev_month_start, prev_month_end))
-                 .filter(Transaction.mcc == request_mcc)
-                 .group_by(Transaction.transaction_type,
-                           Transaction.created_at,
-                           Transaction.amount,
-                           Transaction.description,
-                           Transaction.mcc,
-                           MccCode.description)
-                 .order_by(Transaction.amount.desc()))
+        query = (
+            db.session.query(
+                func.date_trunc("month", Transaction.created_at).label("date"),
+                func.sum(Transaction.amount).label("amount"),
+                Transaction.transaction_type,
+                Transaction.mcc,
+                MccCode.short_description.label("mcc_description"),
+            )
+            .join(Account, Transaction.account_id == Account.id)
+            .join(MccCode, MccCode.mcc_code == Transaction.mcc)
+            .join(User, User.id == Account.user_id)
+            .filter(User.id == get_jwt_identity())
+            .filter(Transaction.mcc == request_mcc)
+            .filter(Transaction.transaction_type == request_transaction_type)
+            .group_by(
+                Transaction.transaction_type,
+                "date",
+                "mcc_description",
+                Transaction.mcc,
+            )
+            .order_by(func.date_trunc("month", Transaction.created_at).desc())
+        )
 
         # build a list of dictionaries representing each transaction
         # build a list of dictionaries representing each transaction
         data = [{
-            "created_at": result.created_at,
+            "date": result.date,
             "amount": result.amount,
-            "transaction_description": result.description,
+           # "transaction_description": result.description,
             "transaction_type": result.transaction_type,
             "mcc_code": result.mcc,
             "mcc_description": result.mcc_description
         } for result in query]
         # return the list of transactions in the response
         return make_response(jsonify(data), 200)
+
+
+class TransByMCC(Resource):
+        """
+        A class representing the endpoint for retrieving transactions filtered by MCC code.
+        """
+
+        @jwt_required()
+        def post(self):
+            """
+            This method handles GET requests to the endpoint. It retrieves a list of transactions for the authenticated user
+            in the previous month that match the MCC code provided in the request body. The transactions are ordered by
+            amount in descending order.
+
+            :return: A list of transactions in the response, with a status code of 200.
+            """
+            # get the start and end dates for the previous month
+            prev_month_start, prev_month_end = prev_month()
+            # get the MCC code from the request body
+            request_mcc = request.json.get("mcc_code", None)
+            request_month = request.json.get("month", None)
+            request_transaction_type = request.json.get("transaction_type", None)
+
+            # get the transactions for the given MCC code and the authenticated user in the previous month,
+            # ordered by amount in descending order
+            query = (db.session.query(Transaction.created_at,
+                                      Transaction.amount,
+                                      Transaction.description,
+                                      Transaction.transaction_type,
+                                      Transaction.mcc,
+                                      MccCode.short_description.label('mcc_description'))
+                     .join(Account, Transaction.account_id == Account.id)
+                     .join(MccCode, MccCode.mcc_code == Transaction.mcc)
+                     .join(User, User.id == Account.user_id)
+                     .filter(User.id == get_jwt_identity())
+                     .filter(func.date_trunc('month', Transaction.created_at).label('month') == request_month)
+                     .filter(Transaction.mcc == request_mcc)
+                     .filter(Transaction.transaction_type == request_transaction_type)
+                     .group_by(Transaction.transaction_type,
+                               Transaction.created_at,
+                               Transaction.amount,
+                               Transaction.description,
+                               Transaction.mcc,
+                               MccCode.short_description)
+                     .order_by(Transaction.amount.desc()))
+
+            # build a list of dictionaries representing each transaction
+            # build a list of dictionaries representing each transaction
+            data = [{
+                "created_at": result.created_at,
+                "amount": result.amount,
+                "transaction_description": result.description,
+                "transaction_type": result.transaction_type,
+                "mcc_code": result.mcc,
+                "mcc_description": result.mcc_description
+            } for result in query]
+            # return the list of transactions in the response
+            return make_response(jsonify(data), 200)

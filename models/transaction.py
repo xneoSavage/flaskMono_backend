@@ -1,7 +1,6 @@
 from externals import db
 from datetime import datetime
 from models.account import Account
-from models.mcc import MccCode
 
 
 class Transaction(db.Model):
@@ -15,7 +14,7 @@ class Transaction(db.Model):
 	# card_id = Column(String(30), ForeignKey('accounts.card_id'))#,ForeignKey(accounts.card_id)
 	description = db.Column(db.String(255))
 	transaction_type = db.Column(db.String(10))
-	mcc = db.Column(db.Integer, db.ForeignKey(MccCode.mcc_code))
+	mcc = db.Column(db.Integer)
 	original_mcc = db.Column(db.Integer)
 	amount = db.Column(db.Integer)
 	operation_amount = db.Column(db.Integer)

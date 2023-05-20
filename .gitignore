@@ -1,0 +1,11 @@
+# Ignore logs
+.log
+
+# Ignore textfiles
+.txt
+
+# Ignore env files
+.env
+
+# Ignore migrations
+migrations/

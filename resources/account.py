@@ -34,6 +34,7 @@ class LoadAccount(Resource):
           :return: 200 if successful, 400 if something went wrong
         """
         # Check if the API key is active
+        request.headers.get('Authorization')
 
         api_key_status = ApiKey.query.filter_by(user_id=get_jwt_identity()).first()
         existed_accounts = []
