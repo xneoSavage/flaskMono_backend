@@ -217,7 +217,13 @@ class AllTransactions(Resource):
         data = [{
             "id": transaction.transaction_id,
             "amount": transaction.amount,
+            "type": transaction.transaction_type,
+            "currency_code": transaction.currency_code,
+            "cashback_amount": transaction.cashback_amount,
+            "balance": transaction.balance,
+            "mcc": transaction.mcc,
             "time": transaction.created_at,
+
             "description": transaction.description
         } for transaction in transactions]
 

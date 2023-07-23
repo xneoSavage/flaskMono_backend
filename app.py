@@ -217,16 +217,16 @@ def after_request(response):
 
 
 # Resources
-api.add_resource(Login, '/login')
+api.add_resource(Login, '/login') #POST
 # api.add_resource(User, '/user')
-api.add_resource(Logout, '/logout')
+api.add_resource(Logout, '/logout') #POST
 api.add_resource(ChangePassword, '/change-password')
 api.add_resource(CreateUser, '/create-user')
-api.add_resource(Apikey, '/api-key')
-api.add_resource(LoadAccount, '/load-account')
-api.add_resource(AccountsData, '/get-account')
-api.add_resource(LoadTransaction, '/load-transaction')
-api.add_resource(AllTransactions, '/get-transaction')
+api.add_resource(Apikey, '/api-key') #POST
+api.add_resource(LoadAccount, '/load-accounts') #POST
+api.add_resource(AccountsData, '/get-accounts') #GET
+api.add_resource(LoadTransaction, '/load-transactions')
+api.add_resource(AllTransactions, '/get-transactions') #GET
 api.add_resource(CreditTransactions, '/credit-transaction')
 api.add_resource(TransStatisticDebitCredit, '/trans-debit-credit')
 api.add_resource(AmountByMCC, '/amount-mcc')
@@ -234,4 +234,5 @@ api.add_resource(TransByMCC, '/trans-mcc')
 api.add_resource(MccAmountMonth, '/mcc-month')
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.47', port='81', debug=True, use_debugger=True)
+    app.run(host='127.0.0.1', port=5000, debug=True)
+

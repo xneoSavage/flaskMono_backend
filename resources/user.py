@@ -39,7 +39,8 @@ class CreateUser(Resource):
 		# add the new user to the database and commit the changes
 		db.session.add(new_user)
 		db.session.commit()
-		# return a
+		response = 'User is created!'
+		return make_response(response, 200)
 
 
 
